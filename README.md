@@ -87,7 +87,7 @@ Generates a payment address for a user.
 
 #### `CreateOrder(ctx, req)`
 Creates a payment order with an expiration time. Each call generates a new address.
-- **Request**: `CreateOrderRequest` (Amount, Chain, Token, CallbackURL, Metadata)
+- **Request**: `CreateOrderRequest` (OrderID, Amount, Chain, Token, UserID, Metadata)
 - **Response**: `CreateOrderResponse` (OrderID, PaymentAddress, ExpiresAt, etc.)
 
 #### `GetBalance(ctx, chain, token)`

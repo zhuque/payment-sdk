@@ -38,11 +38,12 @@ func (c *Client) GenerateAddress(ctx context.Context, req *GenerateAddressReques
 // Example:
 //
 //	resp, err := client.CreateOrder(ctx, &CreateOrderRequest{
-//	    Amount:      "100.50",
-//	    Chain:       "polygon",
-//	    Token:       "usdc",
-//	    CallbackURL: "https://example.com/webhook",
-//	    Metadata:    map[string]interface{}{"order_id": "12345"},
+//	    OrderID:  "merchant_order_12345",
+//	    Amount:   "100.50",
+//	    Chain:    "polygon",
+//	    Token:    "usdc",
+//	    UserID:   "user_789",
+//	    Metadata: map[string]interface{}{"ref": "inv-001"},
 //	})
 func (c *Client) CreateOrder(ctx context.Context, req *CreateOrderRequest) (*CreateOrderResponse, error) {
 	path := fmt.Sprintf("/api/v1/tenants/%s/orders", c.tenantID)

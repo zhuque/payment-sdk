@@ -127,33 +127,40 @@ func TestCreateOrder_Success(t *testing.T) {
 
 		var req CreateOrderRequest
 		json.NewDecoder(r.Body).Decode(&req)
+		if req.OrderID != "merchant_order_123" {
+			t.Errorf("OrderID = %q, want merchant_order_123", req.OrderID)
+		}
 		if req.Amount != "100.50" {
 			t.Errorf("Amount = %q, want 100.50", req.Amount)
 		}
 		if req.Chain != "polygon" {
 			t.Errorf("Chain = %q, want polygon", req.Chain)
 		}
+		if req.UserID != "user_789" {
+			t.Errorf("UserID = %q, want user_789", req.UserID)
+		}
 
 		w.WriteHeader(http.StatusCreated)
-		w.Write([]byte(`{"order_id":"order_123","payment_address":"0xdef456","amount":"100.50","chain":"polygon","token":"usdc","expires_at":"2026-04-03T12:00:00Z","status":"pending"}`))
+		w.Write([]byte(`{"order_id":"merchant_order_123","payment_address":"0xdef456","amount":"100.50","chain":"polygon","token":"usdc","expires_at":"2026-04-03T12:00:00Z","status":"pending"}`))
 	}))
 	defer server.Close()
 
 	client := NewClient("tenant_123", "ak_test", "sk_test", WithBaseURL(server.URL))
 	req := &CreateOrderRequest{
-		Amount:      "100.50",
-		Chain:       "polygon",
-		Token:       "usdc",
-		CallbackURL: "https://example.com/webhook",
-		Metadata:    map[string]interface{}{"order_id": "12345"},
+		OrderID:  "merchant_order_123",
+		Amount:   "100.50",
+		Chain:    "polygon",
+		Token:    "usdc",
+		UserID:   "user_789",
+		Metadata: map[string]interface{}{"ref": "inv-001"},
 	}
 	resp, err := client.CreateOrder(context.Background(), req)
 
 	if err != nil {
 		t.Fatalf("CreateOrder() failed: %v", err)
 	}
-	if resp.OrderID != "order_123" {
-		t.Errorf("OrderID = %q, want order_123", resp.OrderID)
+	if resp.OrderID != "merchant_order_123" {
+		t.Errorf("OrderID = %q, want merchant_order_123", resp.OrderID)
 	}
 	if resp.PaymentAddress != "0xdef456" {
 		t.Errorf("PaymentAddress = %q, want 0xdef456", resp.PaymentAddress)
@@ -172,11 +179,12 @@ func TestCreateOrder_Error400(t *testing.T) {
 
 	client := NewClient("tenant_123", "ak_test", "sk_test", WithBaseURL(server.URL))
 	req := &CreateOrderRequest{
-		Amount:      "invalid",
-		Chain:       "polygon",
-		Token:       "usdc",
-		CallbackURL: "https://example.com/webhook",
-		Metadata:    map[string]interface{}{},
+		OrderID:  "order_456",
+		Amount:   "invalid",
+		Chain:    "polygon",
+		Token:    "usdc",
+		UserID:   "user_123",
+		Metadata: map[string]interface{}{},
 	}
 	_, err := client.CreateOrder(context.Background(), req)
 
@@ -201,11 +209,12 @@ func TestCreateOrder_ContextCancellation(t *testing.T) {
 
 	client := NewClient("tenant_123", "ak_test", "sk_test", WithBaseURL(server.URL))
 	req := &CreateOrderRequest{
-		Amount:      "100.00",
-		Chain:       "ethereum",
-		Token:       "usdt",
-		CallbackURL: "https://example.com/webhook",
-		Metadata:    map[string]interface{}{},
+		OrderID:  "order_789",
+		Amount:   "100.00",
+		Chain:    "ethereum",
+		Token:    "usdt",
+		UserID:   "user_456",
+		Metadata: map[string]interface{}{},
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())

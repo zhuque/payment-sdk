@@ -57,10 +57,11 @@ func ExampleClient_CreateOrder() {
 	ctx := context.Background()
 
 	req := &sdk.CreateOrderRequest{
-		Amount:      "50.00",
-		Chain:       "bsc",
-		Token:       "usdt",
-		CallbackURL: "https://merchant.com/webhook",
+		OrderID: "merchant_order_999",
+		Amount:  "50.00",
+		Chain:   "bsc",
+		Token:   "usdt",
+		UserID:  "user_123",
 		Metadata: map[string]interface{}{
 			"internal_id": "cart_999",
 		},

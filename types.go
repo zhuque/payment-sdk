@@ -80,12 +80,12 @@ type GenerateAddressResponse struct {
 
 // CreateOrderRequest represents the request to create an order
 type CreateOrderRequest struct {
-	Amount      string                 `json:"amount"`
-	Chain       string                 `json:"chain"`
-	Token       string                 `json:"token"`
-	CallbackURL string                 `json:"callback_url"`
-	Metadata    map[string]interface{} `json:"metadata"`
-	UserID      string                 `json:"user_id"`
+	OrderID  string                 `json:"order_id"`
+	Amount   string                 `json:"amount"`
+	Chain    string                 `json:"chain"`
+	Token    string                 `json:"token"`
+	UserID   string                 `json:"user_id"`
+	Metadata map[string]interface{} `json:"metadata"`
 }
 
 // CreateOrderResponse represents the response after creating an order
