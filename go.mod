@@ -1,4 +1,4 @@
-module github.com/yourorg/payment-gateway/sdk
+module github.com/yourorg/payment-sdk
 
 go 1.25
 

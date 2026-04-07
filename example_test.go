@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/yourorg/payment-gateway/sdk"
+	"github.com/yourorg/payment-sdk"
 )
 
 func ExampleClient_CreatePayout() {
