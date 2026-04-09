@@ -4,6 +4,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"strconv"
 	"time"
 )
@@ -25,7 +26,10 @@ func Sign(method, path, timestamp, body, apiSecret string) string {
 }
 
 // VerifyWebhookSignature verifies the HMAC-SHA256 signature of a webhook payload.
-// The signature is computed as HMAC-SHA256(payload, webhookSecret) and hex-encoded.
+// The signature is computed as HMAC-SHA256(canonicalized_payload, webhookSecret) and hex-encoded.
+//
+// The payload is canonicalized by re-marshaling the JSON with sorted keys to ensure
+// consistent signature verification regardless of JSON key ordering from the source.
 //
 // Parameters:
 //   - payload: the raw JSON body received from the webhook request
@@ -46,10 +50,24 @@ func Sign(method, path, timestamp, body, apiSecret string) string {
 //	    // Process webhook...
 //	}
 func VerifyWebhookSignature(payload []byte, signature, webhookSecret string) bool {
+	canonicalized, err := canonicalizeJSON(payload)
+	if err != nil {
+		return false
+	}
+
 	mac := hmac.New(sha256.New, []byte(webhookSecret))
-	mac.Write(payload)
+	mac.Write(canonicalized)
 	expected := hex.EncodeToString(mac.Sum(nil))
 	return hmac.Equal([]byte(expected), []byte(signature))
+}
+
+// canonicalizeJSON re-marshals JSON with sorted keys for consistent hashing.
+func canonicalizeJSON(data []byte) ([]byte, error) {
+	var obj interface{}
+	if err := json.Unmarshal(data, &obj); err != nil {
+		return nil, err
+	}
+	return json.Marshal(obj)
 }
 
 // DefaultMaxTimeDrift is the default maximum allowed time difference for request timestamps.
