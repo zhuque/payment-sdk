@@ -207,3 +207,82 @@ func TestSign_SensitivityToInputChanges(t *testing.T) {
 		t.Error("changing secret should change signature")
 	}
 }
+
+func TestVerifyWebhookSignature_Valid(t *testing.T) {
+	payload := []byte(`{"event":"payment.confirmed","order_id":"order123","amount":"100.50"}`)
+	secret := "webhook_secret_key"
+
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write(payload)
+	signature := hex.EncodeToString(mac.Sum(nil))
+
+	if !VerifyWebhookSignature(payload, signature, secret) {
+		t.Error("VerifyWebhookSignature should return true for valid signature")
+	}
+}
+
+func TestVerifyWebhookSignature_Invalid(t *testing.T) {
+	payload := []byte(`{"event":"payment.confirmed","order_id":"order123"}`)
+	secret := "webhook_secret_key"
+	invalidSignature := "0000000000000000000000000000000000000000000000000000000000000000"
+
+	if VerifyWebhookSignature(payload, invalidSignature, secret) {
+		t.Error("VerifyWebhookSignature should return false for invalid signature")
+	}
+}
+
+func TestVerifyWebhookSignature_WrongSecret(t *testing.T) {
+	payload := []byte(`{"event":"payment.confirmed"}`)
+	correctSecret := "correct_secret"
+	wrongSecret := "wrong_secret"
+
+	mac := hmac.New(sha256.New, []byte(correctSecret))
+	mac.Write(payload)
+	signature := hex.EncodeToString(mac.Sum(nil))
+
+	if VerifyWebhookSignature(payload, signature, wrongSecret) {
+		t.Error("VerifyWebhookSignature should return false when secret doesn't match")
+	}
+}
+
+func TestVerifyWebhookSignature_TamperedPayload(t *testing.T) {
+	originalPayload := []byte(`{"event":"payment.confirmed","amount":"100"}`)
+	tamperedPayload := []byte(`{"event":"payment.confirmed","amount":"999"}`)
+	secret := "webhook_secret"
+
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write(originalPayload)
+	signature := hex.EncodeToString(mac.Sum(nil))
+
+	if VerifyWebhookSignature(tamperedPayload, signature, secret) {
+		t.Error("VerifyWebhookSignature should return false for tampered payload")
+	}
+}
+
+func TestVerifyWebhookSignature_EmptyPayload(t *testing.T) {
+	payload := []byte{}
+	secret := "webhook_secret"
+
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write(payload)
+	signature := hex.EncodeToString(mac.Sum(nil))
+
+	if !VerifyWebhookSignature(payload, signature, secret) {
+		t.Error("VerifyWebhookSignature should handle empty payload")
+	}
+}
+
+func TestVerifyWebhookSignature_TimingAttackResistance(t *testing.T) {
+	payload := []byte(`{"event":"payment.confirmed"}`)
+	secret := "webhook_secret"
+
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write(payload)
+	validSig := hex.EncodeToString(mac.Sum(nil))
+
+	almostValidSig := "a" + validSig[1:]
+
+	if VerifyWebhookSignature(payload, almostValidSig, secret) {
+		t.Error("VerifyWebhookSignature should reject almost-valid signatures")
+	}
+}

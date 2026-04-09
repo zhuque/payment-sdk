@@ -21,3 +21,31 @@ func Sign(method, path, timestamp, body, apiSecret string) string {
 	mac.Write([]byte(message))
 	return hex.EncodeToString(mac.Sum(nil))
 }
+
+// VerifyWebhookSignature verifies the HMAC-SHA256 signature of a webhook payload.
+// The signature is computed as HMAC-SHA256(payload, webhookSecret) and hex-encoded.
+//
+// Parameters:
+//   - payload: the raw JSON body received from the webhook request
+//   - signature: the value from X-Signature header
+//   - webhookSecret: your webhook secret configured in the payment gateway
+//
+// Returns true if the signature is valid, false otherwise.
+//
+// Example:
+//
+//	func webhookHandler(w http.ResponseWriter, r *http.Request) {
+//	    body, _ := io.ReadAll(r.Body)
+//	    signature := r.Header.Get("X-Signature")
+//	    if !sdk.VerifyWebhookSignature(body, signature, "your_webhook_secret") {
+//	        http.Error(w, "invalid signature", http.StatusUnauthorized)
+//	        return
+//	    }
+//	    // Process webhook...
+//	}
+func VerifyWebhookSignature(payload []byte, signature, webhookSecret string) bool {
+	mac := hmac.New(sha256.New, []byte(webhookSecret))
+	mac.Write(payload)
+	expected := hex.EncodeToString(mac.Sum(nil))
+	return hmac.Equal([]byte(expected), []byte(signature))
+}
