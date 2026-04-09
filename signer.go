@@ -4,6 +4,8 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"strconv"
+	"time"
 )
 
 // Sign generates HMAC-SHA256 signature for API authentication.
@@ -48,4 +50,69 @@ func VerifyWebhookSignature(payload []byte, signature, webhookSecret string) boo
 	mac.Write(payload)
 	expected := hex.EncodeToString(mac.Sum(nil))
 	return hmac.Equal([]byte(expected), []byte(signature))
+}
+
+// DefaultMaxTimeDrift is the default maximum allowed time difference for request timestamps.
+// This matches the payment gateway's 5 minute tolerance.
+const DefaultMaxTimeDrift = 5 * time.Minute
+
+// VerifyAPISignature verifies HMAC-SHA256 signature for incoming API requests.
+// This function matches the payment gateway's signature verification middleware exactly.
+//
+// The signature is computed as: HMAC-SHA256(method + path + timestamp + body, apiSecret)
+//
+// Parameters:
+//   - method: HTTP method (GET, POST, etc.)
+//   - path: Request path without query string (e.g., "/api/v1/payouts")
+//   - timestamp: Unix timestamp string from X-Timestamp header
+//   - body: Raw request body (empty string for GET requests)
+//   - signature: The value from X-Signature header
+//   - apiSecret: The tenant's API secret
+//
+// Returns true if the signature is valid, false otherwise.
+// Timestamp freshness must be validated separately using VerifyTimestamp.
+//
+// Example:
+//
+//	func apiHandler(w http.ResponseWriter, r *http.Request) {
+//	    body, _ := io.ReadAll(r.Body)
+//	    timestamp := r.Header.Get("X-Timestamp")
+//	    signature := r.Header.Get("X-Signature")
+//
+//	    if !sdk.VerifyTimestamp(timestamp, sdk.DefaultMaxTimeDrift) {
+//	        http.Error(w, "request expired", http.StatusUnauthorized)
+//	        return
+//	    }
+//	    if !sdk.VerifyAPISignature(r.Method, r.URL.Path, timestamp, string(body), signature, apiSecret) {
+//	        http.Error(w, "invalid signature", http.StatusUnauthorized)
+//	        return
+//	    }
+//	    // Process request...
+//	}
+func VerifyAPISignature(method, path, timestamp, body, signature, apiSecret string) bool {
+	expected := Sign(method, path, timestamp, body, apiSecret)
+	return hmac.Equal([]byte(expected), []byte(signature))
+}
+
+// VerifyTimestamp checks if a request timestamp is within the allowed time drift.
+// This matches the payment gateway's timestamp validation logic.
+//
+// Parameters:
+//   - timestampStr: Unix timestamp string from X-Timestamp header
+//   - maxDrift: Maximum allowed time difference (use DefaultMaxTimeDrift for gateway compatibility)
+//
+// Returns true if the timestamp is valid (within drift), false otherwise.
+func VerifyTimestamp(timestampStr string, maxDrift time.Duration) bool {
+	timestamp, err := strconv.ParseInt(timestampStr, 10, 64)
+	if err != nil {
+		return false
+	}
+
+	now := time.Now().Unix()
+	diff := now - timestamp
+	if diff < 0 {
+		diff = -diff
+	}
+
+	return diff <= int64(maxDrift.Seconds())
 }

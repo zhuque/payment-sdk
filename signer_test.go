@@ -4,7 +4,9 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"strconv"
 	"testing"
+	"time"
 )
 
 func TestSign_EmptyBody(t *testing.T) {
@@ -284,5 +286,124 @@ func TestVerifyWebhookSignature_TimingAttackResistance(t *testing.T) {
 
 	if VerifyWebhookSignature(payload, almostValidSig, secret) {
 		t.Error("VerifyWebhookSignature should reject almost-valid signatures")
+	}
+}
+
+func TestVerifyAPISignature_Valid(t *testing.T) {
+	method := "POST"
+	path := "/api/v1/payouts"
+	timestamp := "1234567890"
+	body := `{"amount":"100"}`
+	secret := "api_secret"
+
+	signature := Sign(method, path, timestamp, body, secret)
+
+	if !VerifyAPISignature(method, path, timestamp, body, signature, secret) {
+		t.Error("VerifyAPISignature should return true for valid signature")
+	}
+}
+
+func TestVerifyAPISignature_Invalid(t *testing.T) {
+	method := "POST"
+	path := "/api/v1/payouts"
+	timestamp := "1234567890"
+	body := `{"amount":"100"}`
+	secret := "api_secret"
+	wrongSignature := "0000000000000000000000000000000000000000000000000000000000000000"
+
+	if VerifyAPISignature(method, path, timestamp, body, wrongSignature, secret) {
+		t.Error("VerifyAPISignature should return false for invalid signature")
+	}
+}
+
+func TestVerifyAPISignature_WrongSecret(t *testing.T) {
+	method := "POST"
+	path := "/api/v1/payouts"
+	timestamp := "1234567890"
+	body := `{"amount":"100"}`
+	correctSecret := "correct_secret"
+	wrongSecret := "wrong_secret"
+
+	signature := Sign(method, path, timestamp, body, correctSecret)
+
+	if VerifyAPISignature(method, path, timestamp, body, signature, wrongSecret) {
+		t.Error("VerifyAPISignature should return false when secret doesn't match")
+	}
+}
+
+func TestVerifyAPISignature_TamperedBody(t *testing.T) {
+	method := "POST"
+	path := "/api/v1/payouts"
+	timestamp := "1234567890"
+	originalBody := `{"amount":"100"}`
+	tamperedBody := `{"amount":"999"}`
+	secret := "api_secret"
+
+	signature := Sign(method, path, timestamp, originalBody, secret)
+
+	if VerifyAPISignature(method, path, timestamp, tamperedBody, signature, secret) {
+		t.Error("VerifyAPISignature should return false for tampered body")
+	}
+}
+
+func TestVerifyAPISignature_EmptyBody(t *testing.T) {
+	method := "GET"
+	path := "/api/v1/payouts/123"
+	timestamp := "1234567890"
+	body := ""
+	secret := "api_secret"
+
+	signature := Sign(method, path, timestamp, body, secret)
+
+	if !VerifyAPISignature(method, path, timestamp, body, signature, secret) {
+		t.Error("VerifyAPISignature should handle empty body (GET requests)")
+	}
+}
+
+func TestVerifyTimestamp_Valid(t *testing.T) {
+	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
+
+	if !VerifyTimestamp(timestamp, DefaultMaxTimeDrift) {
+		t.Error("VerifyTimestamp should return true for current timestamp")
+	}
+}
+
+func TestVerifyTimestamp_Expired(t *testing.T) {
+	timestamp := strconv.FormatInt(time.Now().Add(-10*time.Minute).Unix(), 10)
+
+	if VerifyTimestamp(timestamp, DefaultMaxTimeDrift) {
+		t.Error("VerifyTimestamp should return false for expired timestamp (10 min old)")
+	}
+}
+
+func TestVerifyTimestamp_Future(t *testing.T) {
+	timestamp := strconv.FormatInt(time.Now().Add(10*time.Minute).Unix(), 10)
+
+	if VerifyTimestamp(timestamp, DefaultMaxTimeDrift) {
+		t.Error("VerifyTimestamp should return false for future timestamp (10 min ahead)")
+	}
+}
+
+func TestVerifyTimestamp_InvalidFormat(t *testing.T) {
+	if VerifyTimestamp("invalid", DefaultMaxTimeDrift) {
+		t.Error("VerifyTimestamp should return false for invalid timestamp format")
+	}
+
+	if VerifyTimestamp("", DefaultMaxTimeDrift) {
+		t.Error("VerifyTimestamp should return false for empty timestamp")
+	}
+}
+
+func TestVerifyTimestamp_BoundaryConditions(t *testing.T) {
+	now := time.Now().Unix()
+
+	justWithinDrift := strconv.FormatInt(now-int64(DefaultMaxTimeDrift.Seconds()), 10)
+	if !VerifyTimestamp(justWithinDrift, DefaultMaxTimeDrift) {
+		t.Error("VerifyTimestamp should return true for timestamp exactly at max drift")
+	}
+
+	justOutsideDrift := strconv.FormatInt(now-int64(DefaultMaxTimeDrift.Seconds())-1, 10)
+	if VerifyTimestamp(justOutsideDrift, DefaultMaxTimeDrift) {
+		t.Error("VerifyTimestamp should return false for timestamp just beyond max drift")
 	}
 }
